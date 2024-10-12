@@ -3,6 +3,7 @@
 #include <chrono>
 #include <thread>
 #include <list>
+#include <vector>
 
 // ANSI escape codes for text color
 #define RESET   "\033[0m"
@@ -13,32 +14,125 @@
 #define MAGENTA "\033[35m"
 #define CYAN    "\033[36m"
 
-/*
--main game logic 
--something like undertale
 
-*/
+//class declaration
+class Slime; 
+class Player;
 
 
+//Entity BASE class 
 class Entity{
 public:
     std::string name;
-    int hp;
+    int hp, playerArmor;
+    int blindStatus; //standard is 2
 
-    void takeDmg(int amount){
-        this->hp -= amount;
+    void takeDmg(int amount, int attackedEntitiesArmor){
+        
+        int reducedDmg = (amount * (attackedEntitiesArmor / 100.0));
+        this->hp -= (amount - reducedDmg);
         if (this->hp < 0)
         {
             std::cout << this->name << " has died!";
-        }
-        
+        }        
     }
 
 };
 
 
-class Slime : public Entity{
+//make the player class and then update the methods later on
+class Player : public Entity{
+private:
+    int originalArmor;
+
+public:
+
+    class Inventory{ //inventory class used to gather item related info like attackDmg health buffer 
+        private: //kinda the guideline of what a item is 
+
+
+            struct ArmorItem{ // struct for armor items
+                std::string  name, itemType = "armor";
+                int armorBuff; 
+
+                ArmorItem(std::string name, int aBuff) : name(name) , armorBuff(aBuff) {} 
+            };
+
+
+            struct WeaponItem{ // struct for weapons they give attackBuff
+                std::string itemType = "weapon";
+                std::string name;
+                int dmgBuff;
+                
+                WeaponItem(std::string name, int dBuff) : name(name), dmgBuff(dBuff) {}
+            };
+            
+
+            struct MixedItem{ // they give attackBuff healthBuff hpBuff 
+                std::string itemType = "mixed";
+                std::string name;
+                int dmgBuff;
+                int armorBuff;
+                int healthBuff;
+
+                MixedItem(std::string name, int dBuff, int aBuff, int hBuff) 
+                    : name(name), dmgBuff(dBuff), armorBuff(aBuff),  healthBuff(hBuff) {}
+            };
+
+            // a vector which is in this case is a list of structs
+            std::vector<ArmorItem> armorItems; 
+            std::vector<WeaponItem> weaponItems;
+            std::vector<MixedItem> mixedItems;
+
+
+        public: // where we add items to the vector 
+
+
+            void addArmorItem(std::string name, int armorBuff) {
+                armorItems.emplace_back(name, armorBuff);
+            
+            }
+
+            void addWeaponItem(std::string name, int dmgBuff) {
+                weaponItems.emplace_back(name, dmgBuff);
+            
+            }
+
+            void addMixedItem(std::string name, int dmgBuff, int armorBuff, int healthBuff) {
+                mixedItems.emplace_back(name, dmgBuff, armorBuff, healthBuff);
+            
+            }
+    };
     
+    std::string race;
+    int attackDmg;
+
+
+    Player(std::string name, std::string race){
+        this->name = name;
+        this->race = race;
+        this->hp = 100;
+        this->attackDmg = 20;
+        this->playerArmor = 20;
+    }
+
+    void attacking(Entity* entity);
+
+    void onGuard(){ // ads extra armor 
+        originalArmor = this->playerArmor;
+        this->playerArmor += this->playerArmor; 
+    }
+
+    void unGuard(){ // removes the extra armor
+        this->playerArmor = originalArmor;
+    }
+
+
+};
+
+
+//Slime class with methods
+class Slime : public Entity{
 public:
     int attackDmg;
     std::string type;
@@ -48,10 +142,22 @@ public:
         this->hp = hp;
         this->attackDmg = attackDmg;
         this->type = type;
+        this->playerArmor = 0;
+        
     }
 
     ~Slime(){
-        std::cout << "Slime type " << this->type << " has been killed" << std::endl;
+        std::cout << "Slime named " << this->name << " has been killed" << std::endl;
+    }
+
+    void attack(Player* player,bool blindStatus=false){
+        if (blindStatus == true){
+
+            std::cout << "no damage was dealt cause of blind" << std::endl;
+            return; 
+        }
+        player->takeDmg(this->attackDmg, player->playerArmor);
+        return;
     }
 
 private:
@@ -59,28 +165,19 @@ private:
 };
 
 
-class Player : public Entity{
-public:
+void Player::attacking(Entity* entity){
+    std::cout << "player attacking" << std::endl;
+    entity->takeDmg(this->attackDmg, entity->playerArmor);
+}
 
-    int attackDmg;
-    std::string race;
 
-    Player(std::string name, std::string race){
-        this->name = name;
-        this->hp = 100;
-        this->attackDmg = 20;
-        this->race = race;
 
-    }
 
-    void attacking(Entity* entity){
-        entity->takeDmg(this->attackDmg);
-    }
 
-};
-
-char takeAction(char userInput, Entity* entity , Player* player);
+char takeAction(char userInput, Slime* slime , Player* player);
 void printText(std::string text, int speed = 4);
+char enemyAction(Player* player, Slime* slime,bool guarded=false);
+
 
 int main(){
 
@@ -100,8 +197,8 @@ int main(){
     "you started heading for the nearby hill to try and see Cockus from there.\n";
     printText(firstActionDialogue);
 
-    std::string userName, race;
 
+    std::string userName, race; // character making
     char answer;
     
     while (true){
@@ -120,22 +217,40 @@ int main(){
             break;
         }
     }
-
     Player mainPlayer(userName, race);
+
+
         
     std::string afterWakingUp = "As you are heading for the hill you saw a slime "
     "when you tried to talk to the slime the slime took aggressive stance "
     "and instantly tried attacking you. \n\n";
     printText(afterWakingUp);
 
-    char action;
-    std::cout << "So what will you do?" << GREEN 
-    << "\nA/a for attack G/g for guard T/t for talk: " << RESET;
-    std::cin >> action;
+    Slime slime1(10, "brown", "slim", 40); // creating slime
+    while (true){ // fight mechanic
 
-    Slime slime1(10, "brown", "slim", 100);
-    takeAction(action, &slime1, &mainPlayer);
+        char action; // taking user input
+        std::cout << "So what will you do?" << GREEN 
+        << "\nA/a for attack G/g for guard S/s for shotting the enemy in the eye and blinding them: " << RESET;
+        std::cin >> action;
+
+        takeAction(action, &slime1, &mainPlayer); //take action based on user input  
     
+
+        if(slime1.hp <= 0){
+            printText("You Killed The Slime!",100); //is the base for kill msgs
+            printText(std::string("You found a new item called the ")+ MAGENTA +" Wand" + RESET);
+
+
+
+            break;
+        }else{
+            printText(("Slime has "+ std::to_string(slime1.hp) + " left"));
+        }
+    }// end of the first fight with the slime
+
+
+
 
     return 0;
 }
@@ -143,33 +258,74 @@ int main(){
 void printText(std::string text,int speed){
     int i;
     for ( i = 0; i < text.size(); i++)
-    {
+    {   
         std::cout << text[i];
         std::cout.flush();
         std::this_thread::sleep_for(std::chrono::milliseconds(speed));
     }
     std::cout << std::endl;
+    return;
 }           
 
-char takeAction(char userInput, Entity* entity , Player* player){
+char takeAction(char userInput, Slime* slime , Player* player){ //checks the user input for a,g,s
+    
+    if (userInput == 'A' || userInput == 'a'){ // attacking
+        printText("You attacked the "+slime->name);
+        player->attacking(slime);
 
-    if (userInput == 'A' || userInput == 'a')
-    {
-        player->attacking(entity);
-        printText("You attacked the "+entity->name);
-
-
+        if(slime->hp <= 0){ //checks if the slime is alive
+            
+            return 'a';
+            
+        }else{
+            
+            enemyAction(player, slime);
+            return 'a';
+        }
     }
-    else if (userInput == 'G' || userInput == 'g')
+    else if (userInput == 'G' || userInput == 'g') // guarding 
     {
+        enemyAction(player, slime, true);
         return 'g';
+
     }
-    else if (userInput == 'T' || userInput == 't')
+    else if (userInput == 'S' || userInput == 's')
     {
-        return 't';
+        printText("you shot the "+slime->name+" and blinded them");
+        slime->blindStatus += 2;
+        enemyAction(player, slime);
+        return 's';
     }
     else{
+
+        printText("Enter a valid input!");
         return 'n';
     }
+    enemyAction(player, slime);
+    return 'n';
+}
+
+char enemyAction(Player* player, Slime* slime,bool guarded){
+
+    if(slime->blindStatus > 0){ //check if slime is blinded
+
+        slime->attack(player, true);
+        slime->blindStatus--;
+        
+    }else if(guarded){ // if guarded remove the extra armor
+
+        player->onGuard();
+        
+        slime->attack(player);
+
+        player->unGuard();
+
+    
+    }else{
+
+        slime->attack(player);
+    }
+    
+    printText("You got attacked by "+slime->name+ "\nyour hp is "+ GREEN + std::to_string(player->hp) + RESET);
     return 'n';
 }
