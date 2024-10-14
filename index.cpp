@@ -4,6 +4,7 @@
 #include <thread>
 #include <list>
 #include <vector>
+#include <unordered_map>
 
 // ANSI escape codes for text color
 #define RESET   "\033[0m"
@@ -37,14 +38,12 @@ public:
         }        
     }
 
+
 };
 
 
 //make the player class and then update the methods later on
 class Player : public Entity{
-private:
-    int originalArmor;
-
 public:
 
     class Inventory{ //inventory class used to gather item related info like attackDmg health buffer 
@@ -80,45 +79,82 @@ public:
             };
 
             // a vector which is in this case is a list of structs
-            std::vector<ArmorItem> armorItems; 
-            std::vector<WeaponItem> weaponItems;
-            std::vector<MixedItem> mixedItems;
+            std::unordered_map<std::string, ArmorItem> armorItems; 
+            std::unordered_map<std::string, WeaponItem> weaponItems;
+            std::unordered_map<std::string, MixedItem> mixedItems;
 
 
-        public: // where we add items to the vector 
+        public: // functions that add item structs to the   vector
 
-
+            //adds a armor to player inventory
             void addArmorItem(std::string name, int armorBuff) {
-                armorItems.emplace_back(name, armorBuff);
-            
+                armorItems[name] = {name, armorBuff};
+                printText("you picked up an armor piece!\nname: "+ name +"\narmor: " + std::to_string(armorBuff));
             }
 
+            //adds weapon item to player inventory
             void addWeaponItem(std::string name, int dmgBuff) {
-                weaponItems.emplace_back(name, dmgBuff);
+                weaponItems[name] = {name, dmgBuff};
+                printText("you picked up a weapon!\nname: "+ name +"\nAttack Damage: " + std::to_string(dmgBuff));
             
             }
-
+            //adds mixed item to player inventory
             void addMixedItem(std::string name, int dmgBuff, int armorBuff, int healthBuff) {
-                mixedItems.emplace_back(name, dmgBuff, armorBuff, healthBuff);
-            
+                mixedItems[name] = {name, dmgBuff, armorBuff, healthBuff};
+                printText("you picked up mixed weapon!\nname: "+ name +"\nAttack Damage: " + std::to_string(dmgBuff)+"\nArmor: "+ std::to_string(armorBuff) +"\nHealth Buff:"+ std::to_string(healthBuff));
+
             }
-    };
+            // functions to work with inventory
+
+            //print inventory items using for loops
+            void printInventoryItems(){
+                //prints armorItems
+                std::cout << "Armors:\n" << std::endl;
+                for (const auto& pair : armorItems){
+                    std::cout << "Name: " <<pair.first << " Armor" << pair.second.armorBuff << std::endl;
+                
+                }
+
+                std::cout << "\nWeapons:" << std::endl; 
+                for (const auto& pair : weaponItems){
+                    std::cout << "Name: " <<pair.first << " Attack Damage:" << pair.second.dmgBuff << std::endl;
+                
+                }
+                
+                std::cout << "\nWeapons:" << std::endl; 
+                for (const auto& pair : mixedItems){
+                    std::cout << "Name: " <<pair.first << " Attack Damage:" << pair.second.dmgBuff << " Armor:" << pair.second.armorBuff << " Heal Buff" << pair.second.healthBuff <<std::endl;
+                
+                }
+                    std::cout << "\n" << std::endl;
+            }
+            //function to get the weapon attack damage
+
+            
     
+    };
+private:
+    int originalArmor;
+
+public:
+    Inventory inventory;
     std::string race;
     int attackDmg;
 
 
-    Player(std::string name, std::string race){
+    Player(std::string name, std::string race){ //player object constructor
+        inventory.addWeaponItem("Basic Dagger", 5);
         this->name = name;
         this->race = race;
         this->hp = 100;
         this->attackDmg = 20;
         this->playerArmor = 20;
+
     }
 
     void attacking(Entity* entity);
 
-    void onGuard(){ // ads extra armor 
+    void onGuard(){ // adds extra armor 
         originalArmor = this->playerArmor;
         this->playerArmor += this->playerArmor; 
     }
@@ -227,6 +263,7 @@ int main(){
     printText(afterWakingUp);
 
     Slime slime1(10, "brown", "slim", 40); // creating slime
+
     while (true){ // fight mechanic
 
         char action; // taking user input
@@ -248,7 +285,6 @@ int main(){
             printText(("Slime has "+ std::to_string(slime1.hp) + " left"));
         }
     }// end of the first fight with the slime
-
 
 
 
